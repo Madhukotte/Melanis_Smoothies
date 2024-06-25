@@ -32,12 +32,13 @@ if ingredients_list:
     ingredients_string = ''
     
     for fruit_chosen in ingredients_list:
-        ingredients_string += fruit_chosen + ' '
+        # Find corresponding SEARCH_ON value for the chosen fruit
+        search_on_value = pd_df.loc[pd_df['FRUIT_NAME'] == fruit_chosen, 'SEARCH_ON'].iloc[0]
 
         # Retrieve and display nutrition information using an API
         st.subheader(fruit_chosen + ' Nutrition Information')
         try:
-            fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + fruit_chosen.lower())
+            fruityvice_response = requests.get(f"https://fruityvice.com/api/fruit/{search_on_value}")
             if fruityvice_response.status_code == 200:
                 fv_json = fruityvice_response.json()
                 st.json(fv_json)
@@ -45,6 +46,8 @@ if ingredients_list:
                 st.error(f"Failed to fetch nutrition info for {fruit_chosen}. Status code: {fruityvice_response.status_code}")
         except requests.exceptions.RequestException as e:
             st.error(f"Error fetching nutrition info for {fruit_chosen}: {e}")
+
+        ingredients_string += fruit_chosen + ' '
 
     # Insert order into Snowflake table
     if name_on_order and ingredients_string.strip():
@@ -61,4 +64,3 @@ if ingredients_list:
                 st.error(f"Failed to submit order: {e}")
         else:
             st.warning('Click "Submit Order" to place your order.')
-
