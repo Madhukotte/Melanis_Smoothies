@@ -41,7 +41,11 @@ if ingredients_list:
             fruityvice_response = requests.get(f"https://fruityvice.com/api/fruit/{search_on_value}")
             if fruityvice_response.status_code == 200:
                 fv_json = fruityvice_response.json()
-                st.json(fv_json)
+                # st.json(fv_json)
+                # Convert JSON data to Pandas DataFrame
+                fv_df = pd.DataFrame([fv_json])
+                # fv_df = st.dataframe(data=fruityvice_response.json(), use_container_width=True)
+                st.dataframe(data=fv_df, use_container_width=True)
             else:
                 st.error(f"Failed to fetch nutrition info for {fruit_chosen}. Status code: {fruityvice_response.status_code}")
         except requests.exceptions.RequestException as e:
