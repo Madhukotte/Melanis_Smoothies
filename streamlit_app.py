@@ -36,17 +36,29 @@ if ingredients_list:
 
         # Retrieve and display nutrition information using an API
         st.subheader(fruit_chosen + ' Nutrition Information')
-        fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + fruit_chosen)
-        fv_json = fruityvice_response.json()
-        st.json(fv_json)
+        try:
+            fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + fruit_chosen.lower())
+            if fruityvice_response.status_code == 200:
+                fv_json = fruityvice_response.json()
+                st.json(fv_json)
+            else:
+                st.error(f"Failed to fetch nutrition info for {fruit_chosen}. Status code: {fruityvice_response.status_code}")
+        except requests.exceptions.RequestException as e:
+            st.error(f"Error fetching nutrition info for {fruit_chosen}: {e}")
 
     # Insert order into Snowflake table
-    my_insert_stmt = """INSERT INTO smoothies.public.orders (ingredients, name_on_order)
-                        VALUES ('{}', '{}')""".format(ingredients_string.strip(), name_on_order)
+    if name_on_order and ingredients_string.strip():
+        my_insert_stmt = f"""INSERT INTO smoothies.public.orders (ingredients, name_on_order)
+                            VALUES ('{ingredients_string.strip()}', '{name_on_order}')"""
+        
+        time_to_insert = st.button('Submit Order')
 
-    time_to_insert = st.button('Submit Order')
-
-    if time_to_insert:
-        session.sql(my_insert_stmt).collect()
-        st.success('Your Smoothie order has been submitted!')
+        if time_to_insert:
+            try:
+                session.sql(my_insert_stmt).collect()
+                st.success('Your Smoothie order has been submitted!')
+            except Exception as e:
+                st.error(f"Failed to submit order: {e}")
+        else:
+            st.warning('Click "Submit Order" to place your order.')
 
