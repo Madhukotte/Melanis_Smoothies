@@ -1,84 +1,52 @@
-# Import python packages
 import streamlit as st
-#from snowflake.snowpark.context import get_active_session
 from snowflake.snowpark.functions import col
 import requests
-# Write directly to the app
+
+# Title and introduction
 st.title("Customize Your Smoothie! :balloon:")
-st.write(
-    """Choose the fruits you want in your custome Smoothie!
-    """
-)
+st.write("Choose the fruits you want in your custom Smoothie!")
 
-#Adding Interactive Elements
-#import streamlit as st
-
-# option =st.selectbox(
-#   'How would you like to be contacted?',
-#    ('Email','Home Phone','Mobile phone')
-# )
-
-# st.write('You selected:',option)
-
-#Let's ask about fruits instead of contact methods.
-
-# option =st.selectbox(
-#    'What is your fevorite fruit?',
-#    ('Banana','Strawberries','Peaches')
-# )
-
-# st.write('You selected:',option)
-
-
-#COl statmenet
-#from snowflake.snowpark.functions import col
-#session = get_active_session()
-#my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'),col('SEARCH_ON'))
-#st.dataframe(data=my_dataframe, use_container_width=True)
-#st.stop()
-
-#Add a Multiset
+# Input for name on order
 name_on_order = st.text_input('Name on the Smoothie:')
 st.write('The name on the Smoothie will be:', name_on_order)
 
+# Snowflake connection setup
 cnx = st.connection("snowflake")
 session = cnx.session()
-my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
-#st.dataframe(data=my_dataframe, use_container_width=True)
 
+# Fetch fruit options from Snowflake table
+my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'), col('SEARCH_ON'))
 
+# Convert Snowpark Dataframe to Pandas Dataframe
+pd_df = my_dataframe.to_pandas()
 
-my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'),col('SEARCH_ON'))
-#st.dataframe(data=my_dataframe, use_container_width=True)
-#st.stop()
-
-# Convert the Snowpark Dataframe to a Pandas Dataframe so we can use the LOC function
-pd_df=my_dataframe.to_pandas()
-#st.dataframe(pd_df)
-#st.stop()
-
+# Multiselect for choosing ingredients
 ingredients_list = st.multiselect(
-    'Choose upto 5  ingredients:'
-    ,my_dataframe
-    ,max_selections=5
+    'Choose up to 5 ingredients:',
+    pd_df['FRUIT_NAME'].tolist(),
+    max_selections=5
 )
-if ingredients_list:
-        ingredients_string=''
-    
-        for fruit_chosen in ingredients_list:
-            ingredients_string += fruit_chosen + ''
 
-            search_on = pd_df.loc[pd_df['FRUIT_NAME'] == fruit_chosen, 'SEARCH_ON'].iloc[0]
-            st.write('The search value for', fruit_chosen,'is',search_on,'.')
-            st.subheader(fruit_chosen + 'Nutrition Information')
-            fruityvice_response = requests.get("https://fruityvice.com/api/fruit/"+ fruit_chosen)
-            fv_df = st.dataframe(data=fruityvice_response.json(), use_container_width=True)
-            #st.write(ingredients_string)
-            my_insert_stmt = """ insert into smoothies.public.orders(ingredients,name_on_order)
-            values ('""" + ingredients_string + """','""" + name_on_order + """')"""
-            st.write(my_insert_stmt)
-            # st.stop()
-        time_to_insert = st.button('Submit Order')
-        if time_to_insert:
-            session.sql(my_insert_stmt).collect()
-            st.success('Your Smoothie is ordered!',icon="✅")
+# Processing selected ingredients
+if ingredients_list:
+    ingredients_string = ''
+    
+    for fruit_chosen in ingredients_list:
+        ingredients_string += fruit_chosen + ' '
+
+        # Retrieve and display nutrition information using an API
+        st.subheader(fruit_chosen + ' Nutrition Information')
+        fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + fruit_chosen)
+        fv_json = fruityvice_response.json()
+        st.json(fv_json)
+
+    # Insert order into Snowflake table
+    my_insert_stmt = """INSERT INTO smoothies.public.orders (ingredients, name_on_order)
+                        VALUES ('{}', '{}')""".format(ingredients_string.strip(), name_on_order)
+
+    time_to_insert = st.button('Submit Order')
+
+    if time_to_insert:
+        session.sql(my_insert_stmt).collect()
+        st.success('Your Smoothie order has been submitted!')
+
